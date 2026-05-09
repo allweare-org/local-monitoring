@@ -6,7 +6,7 @@ from pysolarmanv5 import PySolarmanV5
 # -----------------------------
 # CONFIG
 # -----------------------------
-LOGGER_IP = "192.168.1.20"      # Change this on-site
+LOGGER_IP = "127.0.0.1"
 SERIAL_NUMBER = 1234567890      # Change this (from inverter/logger)
 CSV_FILE = "inverter_log.csv"
 POLL_INTERVAL = 60              # seconds
