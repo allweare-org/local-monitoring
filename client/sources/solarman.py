@@ -1,7 +1,7 @@
 from pysolarmanv5 import PySolarmanV5
-from data_source import DataSource
+from sources.base import DataSource
 
-class RealSolarmanSource(DataSource):
+class SolarmanSource(DataSource):
     def __init__(self, ip, serial):
         self.client = PySolarmanV5(ip, serial)
 

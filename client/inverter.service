@@ -1,0 +1,13 @@
+[Unit]
+Description=Inverter Monitoring Service
+After=network.target
+
+[Service]
+User=manasa
+WorkingDirectory=/home/manasa/local-monitoring/client
+ExecStart=/home/manasa/local-monitoring/client/venv/bin/python main.py
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

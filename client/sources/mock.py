@@ -1,5 +1,5 @@
 import random
-from data_source import DataSource
+from sources.base import DataSource
 
 class MockSource(DataSource):
     def read(self):
