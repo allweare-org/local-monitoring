@@ -1,7 +1,7 @@
 import csv
 import time
 from datetime import datetime
-from pysolarmanv5 import SolarmanV5
+from pysolarmanv5 import PySolarmanV5
 
 # -----------------------------
 # CONFIG
@@ -39,8 +39,7 @@ def log_to_csv(data):
 def main():
     print("Starting Deye CSV logger...")
 
-    modbus = SolarmanV5(LOGGER_IP, SERIAL_NUMBER)
-
+    modbus = PySolarmanV5(LOGGER_IP, SERIAL_NUMBER)
     while True:
         try:
             data = modbus.read_holding_registers_dict()
