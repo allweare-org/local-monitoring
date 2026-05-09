@@ -1,4 +1,5 @@
 import csv
+import os
 import time
 from datetime import datetime
 
@@ -18,19 +19,14 @@ def log_to_csv(data):
     keys = sorted(data.keys())
     row = [timestamp] + [data.get(k, "") for k in keys]
 
-    try:
-        with open(CSV_FILE, "r"):
-            pass
-    except FileNotFoundError:
-        with open(CSV_FILE, "w", newline="") as f:
-            writer = csv.writer(f)
-            writer.writerow(["timestamp"] + keys)
-
     with open(CSV_FILE, "a", newline="") as f:
         writer = csv.writer(f)
-        writer.writerow(row)
 
-    print(f"{timestamp} | Logged data")
+        # write header only if file is empty
+        if f.tell() == 0:
+            writer.writerow(["timestamp"] + keys)
+
+        writer.writerow(row)
 
 
 def main():
@@ -54,6 +50,10 @@ def main():
             # 3. Log to CSV safely
             try:
                 log_to_csv(data)
+                with open("heartbeat.txt", "w") as f:
+                    f.write(str(time.time()))
+                print("OK:", data)
+
             except Exception as e:
                 print("CSV write failed:", e)
 
