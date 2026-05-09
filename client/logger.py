@@ -34,7 +34,6 @@ def log_to_csv(data):
 
 
 def main():
-
     if USE_MOCK:
         source = MockSource()
         print("Using MOCK source")
@@ -44,12 +43,31 @@ def main():
 
     while True:
         try:
+            # 1. Read data safely
             data = source.read()
-            log_to_csv(data)
+
+            # 2. Validate data exists
+            if not data:
+                print("Warning: empty data received")
+                continue
+
+            # 3. Log to CSV safely
+            try:
+                log_to_csv(data)
+            except Exception as e:
+                print("CSV write failed:", e)
+
+            # 4. Print heartbeat
+            print("OK:", data)
 
         except Exception as e:
-            print("Error:", e)
+            print("Sensor read error:", e)
 
+            # IMPORTANT: prevents infinite crash loop
+            time.sleep(5)
+            continue
+
+        # normal polling delay
         time.sleep(POLL_INTERVAL)
 
 
