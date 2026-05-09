@@ -1,69 +1,143 @@
 # local-monitoring
 
-Local monitoring system for Deye solar inverters that cannot upload data to the Deye cloud due to Wi-Fi/internet access issues. A Raspberry Pi on the local network polls the Solarman logger attached to the inverter and records data to CSV.
+Production-grade edge IoT system for Solarman V5 inverter monitoring on Raspberry Pi.
 
-## How It Works
+## System Architecture
 
-1. The Solarman Wi-Fi logger is connected to the Deye inverter and exposes Modbus TCP on port **8899**
-2. A Raspberry Pi on the same local network polls the logger every 60 seconds using [`pysolarmanv5`](https://github.com/jmccrohan/pysolarmanv5)
-3. Inverter register data (battery SOC, power output, grid voltage, etc.) is timestamped and appended to a local CSV file
+```text
+                ┌────────────────────────┐
+                │   Solarman V5 Logger   │
+                └──────────┬─────────────┘
+                           │ Ethernet
+                           ▼
+                ┌────────────────────────┐
+                │  Raspberry Pi 3B+      │
+                │  (Edge Agent Node)     │
+                └──────────┬─────────────┘
+                           │
+        ┌──────────────────┼──────────────────┐
+        ▼                  ▼                  ▼
+ config.yaml        Data Source        systemd service
+ (deployment)       (mock/real)        (auto-start)
+                           │
+                           ▼
+                ┌────────────────────────┐
+                │   SQLite Database      │
+                │   inverter.db          │
+                └──────────┬─────────────┘
+                           │
+            ┌──────────────┴──────────────┐
+            ▼                             ▼
+     USB Export Tool             Future Cloud Sync
+```
+
+## Quick Start
+
+### 1. Clone & Install
+
+```bash
+git clone https://github.com/allweare-org/local-monitoring.git
+cd local-monitoring/scripts
+bash install.sh
+```
+
+### 2. Enable Auto-Start
+
+```bash
+sudo cp systemd/inverter.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable inverter
+sudo systemctl start inverter
+```
+
+### 3. Verify
+
+```bash
+sudo systemctl status inverter
+```
+
+## Configuration
+
+Edit `client/config.yaml` to switch between mock and real mode:
+
+```yaml
+mode: mock   # mock | real
+
+logger:
+  poll_interval: 60
+
+solarman:
+  ip: 192.168.1.20
+  serial: 1234567890
+
+storage:
+  db_path: inverter.db
+
+export:
+  usb_path: /media/usb
+```
 
 ## Project Structure
 
 ```text
-client/
-├── find_logger.py    # Network scanner to discover the Solarman logger IP on your LAN
-├── logger.py         # Main data logger — connects to a real inverter and logs to CSV
-└── logger_test.py    # Simulation — generates fake inverter data for testing without hardware
+local-monitoring/
+  client/
+    main.py              # Entry point
+    config.yaml          # Deployment config
+    config.py            # Config loader
+    sources/
+      base.py            # DataSource ABC
+      mock.py            # Mock data source
+      solarman.py        # Real Solarman V5 source
+    storage/
+      sqlite_db.py       # SQLite storage layer
+    services/
+      logger.py          # Core logging loop
+      exporter.py        # USB export module
+    logs/
+  scripts/
+    install.sh           # One-command Pi installer
+    start.sh             # Start service
+    stop.sh              # Stop service
+  systemd/
+    inverter.service     # systemd unit file
+  requirements.txt
 ```
 
-## Setup
+## USB Data Export
 
-### 1. Find Your Logger
+Plug in a USB drive and run:
 
-Run the network scanner to discover the Solarman logger on your local network:
-
-```bash
-python client/find_logger.py
+```python
+from services.exporter import export_db
+export_db("inverter.db", "/media/usb")
 ```
 
-This scans the subnet (default `192.168.1.0/24`) for devices with port 8899 open.
+## Runtime Behavior
 
-### 2. Configure
+When the Pi powers on:
 
-Edit `client/logger.py` and set:
+1. systemd starts the inverter service
+2. `main.py` loads `config.yaml`
+3. Selects data source (mock or solarman)
+4. Starts infinite logger loop
+5. Writes to SQLite every interval
+6. Keeps running indefinitely
 
-- `LOGGER_IP` — the IP address found in step 1
-- `SERIAL_NUMBER` — the serial number of your Solarman logger / inverter
-- `POLL_INTERVAL` — polling frequency in seconds (default: 60)
+## Fault Tolerance
 
-### 3. Run
+| Failure | System Response |
+| --- | --- |
+| Inverter disconnects | Retry loop with 5s backoff |
+| Pi reboots | Auto restart via systemd |
+| Power loss | SQLite survives (durable storage) |
+| SSH closed | Service continues in background |
 
-**With a real inverter:**
+## Design Principles
 
-```bash
-pip install pysolarmanv5
-python client/logger.py
-```
-
-**Without hardware (simulation mode):**
-
-```bash
-python client/logger_test.py
-```
-
-This generates random values for battery SOC, inverter power, and grid voltage — useful for testing the CSV pipeline.
-
-## Output
-
-Data is logged to `inverter_log.csv` in the `client/` directory with timestamped rows:
-
-```csv
-timestamp,battery_soc,grid_voltage,inverter_power
-2026-04-21 10:30:00,85,230,1500
-```
-
-## Dependencies
-
-- Python 3
-- [`pysolarmanv5`](https://github.com/jmccrohan/pysolarmanv5) (only needed for real logger connection)
+- **Offline-first** — no internet required
+- **Failure-tolerant** — retries + auto restart
+- **Config-driven** — no code edits in field
+- **Swappable sources** — mock ↔ real via config
+- **Durable storage** — SQLite, not CSV
+- **Auto-start on boot** — systemd managed
