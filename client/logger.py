@@ -1,15 +1,16 @@
 import csv
 import time
 from datetime import datetime
-from pysolarmanv5 import PySolarmanV5
 
-# -----------------------------
-# CONFIG
-# -----------------------------
-LOGGER_IP = "127.0.0.1"
-SERIAL_NUMBER = 1234567890      # Change this (from inverter/logger)
+from mock_source import MockSource
+from solarman_source import RealSolarmanSource
+
 CSV_FILE = "inverter_log.csv"
-POLL_INTERVAL = 60              # seconds
+POLL_INTERVAL = 60
+
+# 🔥 SWITCH HERE
+USE_MOCK = True
+
 
 def log_to_csv(data):
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -17,7 +18,6 @@ def log_to_csv(data):
     keys = sorted(data.keys())
     row = [timestamp] + [data.get(k, "") for k in keys]
 
-    # Create file with header if it doesn't exist
     try:
         with open(CSV_FILE, "r"):
             pass
@@ -26,28 +26,32 @@ def log_to_csv(data):
             writer = csv.writer(f)
             writer.writerow(["timestamp"] + keys)
 
-    # Append row
     with open(CSV_FILE, "a", newline="") as f:
         writer = csv.writer(f)
         writer.writerow(row)
 
     print(f"{timestamp} | Logged data")
 
-# -----------------------------
-# MAIN LOOP
-# -----------------------------
-def main():
-    print("Starting Deye CSV logger...")
 
-    modbus = PySolarmanV5(LOGGER_IP, SERIAL_NUMBER)
+def main():
+
+    if USE_MOCK:
+        source = MockSource()
+        print("Using MOCK source")
+    else:
+        source = RealSolarmanSource("192.168.1.20", 1234567890)
+        print("Using REAL Solarman source")
+
     while True:
         try:
-            data = modbus.read_holding_registers_dict()
+            data = source.read()
             log_to_csv(data)
+
         except Exception as e:
-            print(f"Error: {e}")
+            print("Error:", e)
 
         time.sleep(POLL_INTERVAL)
+
 
 if __name__ == "__main__":
     main()
